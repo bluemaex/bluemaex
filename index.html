@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+	<title>maex.blue 3.11</title>
+	<style>
+		html {
+			height: 100%;
+		}
+		body {
+			margin: 0;
+			padding: 0;
+			height: 100%;
+			background-color: teal;
+			overflow: hidden;
+            font-family: fixedsys, consolas, monospace;
+            user-select: none;
+		}
+        .underline {
+            text-decoration: underline;
+        }
+        .dragging {
+            transition: 0.01s;
+            transform: translateX(-9999px);
+        }
+        .hidden {
+            display: none;
+        }
+        #background {
+			height: 100%;
+			width: 100%;
+			object-fit: cover;
+        }
+
+        .window.maximized {
+            top: 0 !important;
+            left: 0 !important;
+            width: 100%;
+            height: 100%;
+        }
+        .window {
+            background: #cdcdcd;
+            padding: 2px 4px 4px 2px;
+            border: 1px solid #000;
+            resize: both;
+            overflow: hidden;
+            position: absolute;
+            width: 400px;
+            height: 300px;
+            top: 5vh;
+            left: 5vw;
+        }
+        .window[data-item="main"] {
+            top: 40vh;
+            left: 50vw;
+        }
+        @media screen and (max-width:450px) {
+            .window[data-item="main"] {
+                left: 5vw;
+                width: 90vw;
+            }
+        }
+        .window .handle {
+            position: absolute;
+            height: 30px;
+            width: 30px;
+            border-width: 0;
+            border-color: #000;
+            border-style: solid;
+        }
+        .window .handle.topleft {
+            top: -1px;
+            left: -1px;
+            cursor: nwse-resize;
+            border-right-width: 1px;
+            border-bottom-width: 1px;
+        }
+        .window .handle.topright {
+            top: -1px;
+            right: -1px;
+            cursor: nesw-resize;
+            border-left-width: 1px;
+            border-bottom-width: 1px;
+        }
+        .window .handle.bottomleft {
+            bottom: -1px;
+            left: -1px;
+            cursor: nesw-resize;
+            border-right-width: 1px;
+            border-top-width: 1px;
+        }
+        .window .handle.bottomright {
+            bottom: -1px;
+            right: -1px;
+            cursor: nwse-resize;
+            border-left-width: 1px;
+            border-top-width: 1px;
+        }
+
+        .window-container {
+            position: relative;
+            background-color: #fff;
+            height: 100%;
+            width: 100%;
+            border: 1px solid #000;
+            z-index: 2;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .window-container .titlebar {
+            background-color: #000080;
+            text-align: center;
+            line-height: 24px;
+            height: 26px;
+            font-weight: 500;
+            border-bottom: 1px solid #000;
+            display: flex;
+        }
+        .window-container .titlebar .title {
+            color: #fff;
+            width: max-content;
+            flex-grow: 1;
+        }
+        .window-container .titlebar .button {
+            background-color: #c0c0c0;
+            color: #000;
+            width: 20px;
+            height: 20px;
+            font-size: 12px;
+            border: outset 3px;
+            line-height: 20px;
+        }
+        .window-container .titlebar .button:active {
+            border: inset 3px;
+        }
+        .window-container .titlebar .button.close {
+            color: #fff;
+            font-weight: 800;
+            line-height: 16px;
+            text-shadow: -1px 0 #000, 0 1px #000, 1px 0 #000, 0 -1px #000;
+        }
+        .window-container .titlebar .button.close:active {
+            background-color: #7B7F83;
+            color: #000;
+            text-shadow: -1px 0 #fff, 0 1px #fff, 1px 0 #fff, 0 -1px #fff;
+        }
+
+        .window-container .menubar {
+            display: flex;
+            height: 24px;
+            border-bottom: 1px solid #191919;
+        }
+        .window-container .menubar .menuitem {
+            line-height: 24px;
+            padding: 0 7px;
+        }
+
+        .window-container .applications {
+            padding: 15px 5px;
+            height: 100%;
+            display: flex;
+            align-items: flex-end;
+            flex-wrap: wrap;
+            overflow: scroll;
+        }
+        .window-container .applications .icon {
+            width: 80px;
+            font-size: 12px;
+            text-align: center;
+        }
+        .window-container .applications .icon img {
+            width: 32px;
+        }
+
+        .window-container .context-menu {
+            position: absolute;
+            border: solid 1px #000;
+            margin-left: -3px;
+            margin-top: 8px;
+            background: #fff;
+            box-shadow: 1px 1px 5px 0px rgba(0,0,0,.5);
+            color: #000;
+            text-shadow: none;
+            text-align: left;
+        }
+
+        .window-container .context-menu .context-item {
+            font-weight: 600;
+            padding: 5px;
+            padding-right: 20px;
+        }
+
+        .window-container .menubar .menuitem:active,
+        .window-container .context-menu .context-item:active,
+        .window-container .applications .icon:active > .text {
+            background-color: #000080;
+            color: #fff;
+        }
+	</style>
+    <script>
+        function dragStart(event) {
+            const element = event.target.closest('.window')
+            element.classList.add('dragging')
+            const style = window.getComputedStyle(element, null)
+            const data = {
+                item: element.getAttribute('data-item'),
+                left: (parseInt(style.left, 10) - event.clientX),
+                top: (parseInt(style.top, 10) - event.clientY),
+                width: parseInt(style.width, 10),
+                height: parseInt(style.height, 10)
+            }
+            event.dataTransfer.setData('text/plain', JSON.stringify(data))
+        }
+
+        function dragEnd(event) {
+            const element = event.srcElement.closest('.window')
+            element.classList.remove('dragging')
+        }
+
+        function dragOver(event) {
+            event.preventDefault()
+            return false
+        }
+
+        function dragDrop(event) {
+            const data = JSON.parse(event.dataTransfer.getData("text/plain"))
+            const source = document.querySelectorAll(`[draggable="true"][data-item="${data.item}"]`)[0]
+            source.style.left = `${event.clientX + data.left}px`
+            source.style.top = `${event.clientY + data.top}px`
+            event.preventDefault()
+            return false
+        }
+
+        function maximize(event) {
+            const button = event.target
+            const parentWindow = button.closest('.window')
+            const classes = parentWindow.classList
+
+            if (classes.contains('maximized')) button.innerHTML = '&#9650;'
+            else button.innerHTML = '&#11109;'
+            classes.toggle('maximized')
+        }
+
+        function minimize(event) {
+            const button = event.target
+            const parentWindow = button.closest('.window')
+            // parentWindow
+        }
+
+        function windowMenu(event) {
+            const button = event.target
+            const contextMenu = button.querySelector('div.context-menu')
+            if (contextMenu) contextMenu.classList.toggle('hidden')
+        }
+
+        function eightBitImageAnimation(image, scale = 100, endScale = 10) {
+            const canvas = document.getElementById('background')
+            canvas.width = image.width
+            canvas.height = image.height
+            eightBit(canvas, image, scale)
+
+            if (scale > endScale) {
+                setTimeout(eightBitImageAnimation, 30*(100/scale), image, scale-5, endScale)
+            }
+        }
+
+        function eightBit(canvas, image, scale) {
+            const scaledW = canvas.width * scale * 0.01
+            const scaledH = canvas.height * scale * 0.01
+
+            const ctx = canvas.getContext('2d')
+            ctx.imageSmoothingEnabled = false
+            ctx.drawImage(image, 0, 0, scaledW, scaledH)
+            ctx.drawImage(canvas, 0, 0, scaledW, scaledH, 0, 0, image.width, image.height)
+        }
+
+        document.addEventListener("DOMContentLoaded", function() {
+            document.body.addEventListener('dragover', dragOver, false)
+            document.body.addEventListener('drop', dragDrop, false)
+            document.querySelectorAll('.window[draggable="true"]').forEach(win => {
+                win.addEventListener("dragstart", dragStart, false)
+                win.addEventListener("dragend", dragEnd, false)
+            })
+            document.querySelectorAll('.button.close').forEach(button => button.addEventListener("click", windowMenu, false))
+            document.querySelectorAll('.button.maximize').forEach(button => button.addEventListener("click", maximize, false))
+            document.querySelectorAll('.button.minimize').forEach(button => button.addEventListener("click", minimize, false))
+
+            const img = new Image()
+            img.onload = () => eightBitImageAnimation(img)
+            img.src = './latest.jpg'
+        })
+    </script>
+</head>
+<body>
+    <canvas id="background"></canvas>
+    <div class="window" draggable="true" data-item="main">
+        <div class="topleft handle"></div>
+        <div class="topright handle"></div>
+        <div class="bottomleft handle"></div>
+        <div class="bottomright handle"></div>
+        <div class="window-container">
+            <div class="titlebar">
+                <div class="button close">
+                    &#8212;
+                    <div class="context-menu hidden">
+                        <div class="context-item"><span class="underline">R</span>estore</div>
+                        <div class="context-item"><span class="underline">M</span>ove</div>
+                        <div class="context-item"><span class="underline">S</span>ize</div>
+                        <div class="context-item">Mi<span class="underline">n</span>imize</div>
+                        <div class="context-item">Ma<span class="underline">x</span>imize</div>
+                    </div>
+                </div>
+                <span class="title">maex.blue 3.11</span>
+                <div class="button minimize">&#9660;</div>
+                <div class="button maximize">&#9650;</div>
+            </div>
+            <div class="menubar">
+                <div class="menuitem"><span class="underline">F</span>ile</div>
+                <div class="menuitem"><span class="underline">O</span>ptions</div>
+                <div class="menuitem"><span class="underline">W</span>indows</div>
+                <div class="menuitem"><span class="underline">H</span>elp</div>
+            </div>
+            <div class="applications">
+                    <div class="icon">
+                        <a target="_blank" href="mailto:mail AT bluemaex.de?subject=maex.blue"><img src="./icon/email.svg" /></a>
+                        <div class="text">E-Mail</div>
+                    </div>
+                    <div class="icon">
+                        <img src="./icon/construction.svg" />
+                        <div class="text">Notes</div>
+                    </div>
+                    <div class="icon">
+                        <a rel="me" target="_blank" href="https://chaos.social/@bluemaex"><img src="./icon/mastodon.svg" /></a>
+                        <div class="text">Mastodon</div>
+                    </div>
+                    <div class="icon">
+                        <a target="_blank" href="https://maex.photos/bluemaex"><img src="./icon/pixelfed.svg" /></a>
+                        <div class="text">Pixelfed</div>
+                    </div>
+                    <div class="icon">
+                        <a target="_blank" href="https://github.com/bluemaex"><img src="./icon/github.svg" /></a>
+                        <div class="text">Github</div>
+                    </div>
+                    <div class="icon">
+                        <a target="_blank" href="https://www.strava.com/athletes/8942275"><img src="./icon/strava.svg" /></a>
+                        <div class="text">Strava</div>
+                    </div>
+                    <div class="icon">
+                        <a target="_blank" href="https://instagram.com/bluemaex"><img src="./icon/instagram.svg" /></a>
+                        <div class="text">Instagram</div>
+                    </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

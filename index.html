@@ -300,9 +300,11 @@
         /*
          * window functionality
          */
-        function openWindow(name) {
+        function toggleWindow(name) {
             const win = document.querySelector(`.window[data-item="${name}"]`)
             win.classList.toggle('hidden')
+
+            if (name === 'dosprompt') setTimeout(() => document.querySelector('.dosprompt .input').focus(), 10)
         }
 
         function maximize(event) {
@@ -389,9 +391,23 @@
                 case 'dir':
                     content = 'Read error'
                     break
+                case command.match(/^cd .*/)?.input:
+                    content = 'Access denied'
+                    break
+                case command.match(/^ls .*/)?.input:
+                    content = 'Wrong Operating System, my dear.'
+                    break
                 case command.match(/^echo .*/)?.input:
                     content = command.substring(4).trim()
                     break
+                case command.match(/^\s*$/)?.input:
+                    break
+                case 'exit':
+                    setTimeout(() => {
+                        toggleWindow('dosprompt')
+                        document.querySelector('.dosprompt .history').innerHTML = ''
+                    }, 10)
+                    break;
                 default:
                     content = `Illegal command: ${ command }.`
             }
@@ -401,18 +417,14 @@
             document.querySelector('.dosprompt .history').appendChild(line)
         }
 
-        function handleInput(event) {
+        function handlePaste(event) {
+            event.preventDefault()
+
             const input = event.target
-
-            if (input.childElementCount > 0) {
-                const lines = input.innerText.replace(/\n$/, '').split('\n')
-                lines.forEach(line => handleCommand(line))
-                input.textContent = '';
-            }
-
-            if (input.textContent.length === 0) {
-                input.innerHTML = ''
-            }
+            const data = (event.clipboardData || window.clipboardData).getData('text')
+            const lines = data.replace(/\n$/, '').split('\n')
+            lines.forEach(line => handleCommand(line))
+            input.textContent = ''
         }
 
         function handleKeyDown(event) {
@@ -452,7 +464,7 @@
 
             // msdos
             document.querySelector('.dosprompt').addEventListener('click', () => document.querySelector('.dosprompt .input').focus())
-            document.querySelector('.dosprompt').addEventListener('input', handleInput)
+            document.querySelector('.dosprompt').addEventListener('paste', handlePaste)
             document.querySelector('.dosprompt .input').addEventListener('keydown', handleKeyDown)
         })
     </script>
@@ -526,7 +538,7 @@
                     <div class="text">Instagram</div>
                 </div>
                 <div class="icon">
-                    <a href="javascript:openWindow('dosprompt')"><img src="./icon/msdos.svg" /></a>
+                    <a href="javascript:toggleWindow('dosprompt')"><img src="./icon/msdos.svg" /></a>
                     <div class="text">MS-DOS</div>
                 </div>
             </div>

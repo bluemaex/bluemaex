@@ -185,37 +185,59 @@
             text-shadow: none;
             text-align: left;
         }
-
         .window-container .context-menu .context-item {
             font-weight: 600;
             padding: 5px;
             padding-right: 20px;
         }
+        .window-container .context-menu .context-item.disabled {
+            color: #c0c0c0;
+        }
 
+        .window-minimized .icon:active > .text,
         .window-container .menubar .menuitem:active,
         .window-container .context-menu .context-item:active,
         .window-container .applications .icon:active > .text {
             background-color: #000080;
             color: #fff;
         }
+
+        .window-minimized {
+            position: absolute;
+            height: 52px;
+            bottom: 10vh;
+            display: flex;
+            padding: 0 5vw;
+        }
+        .window-minimized .icon {
+            position: absolute;
+            width: 80px;
+            font-size: 12px;
+            text-align: center;
+            color: #fff;
+        }
+        .window-minized .icon img {
+            height: 32px;
+            width: 32px;
+            margin: 10px;
+        }
 	</style>
     <script>
         function dragStart(event) {
-            const element = event.target.closest('.window')
-            element.classList.add('dragging')
+            const element = event.target.closest('.draggable')
             const style = window.getComputedStyle(element, null)
             const data = {
-                item: element.getAttribute('data-item'),
+                item: `.${element.getAttribute('class').replace(' ', '.')}[data-item='${element.getAttribute('data-item')}']`,
                 left: (parseInt(style.left, 10) - event.clientX),
-                top: (parseInt(style.top, 10) - event.clientY),
-                width: parseInt(style.width, 10),
-                height: parseInt(style.height, 10)
+                top: (parseInt(style.top, 10) - event.clientY)
             }
+            element.classList.add('dragging')
+            console.log(element, data)
             event.dataTransfer.setData('text/plain', JSON.stringify(data))
         }
 
         function dragEnd(event) {
-            const element = event.srcElement.closest('.window')
+            const element = event.srcElement.closest('.draggable')
             element.classList.remove('dragging')
         }
 
@@ -226,7 +248,8 @@
 
         function dragDrop(event) {
             const data = JSON.parse(event.dataTransfer.getData("text/plain"))
-            const source = document.querySelectorAll(`[draggable="true"][data-item="${data.item}"]`)[0]
+            const source = document.querySelector(data.item)
+            console.log(source)
             source.style.left = `${event.clientX + data.left}px`
             source.style.top = `${event.clientY + data.top}px`
             event.preventDefault()
@@ -234,25 +257,48 @@
         }
 
         function maximize(event) {
-            const button = event.target
-            const parentWindow = button.closest('.window')
+            const parentWindow = event.target.closest('.window')
             const classes = parentWindow.classList
-
-            if (classes.contains('maximized')) button.innerHTML = '&#9650;'
-            else button.innerHTML = '&#11109;'
+            const maximizeButton = parentWindow.querySelector('.button.maximize')
+            if (classes.contains('maximized')) maximizeButton.innerHTML = '&#9650;'
+            else maximizeButton.innerHTML = '&#11109;'
             classes.toggle('maximized')
         }
 
         function minimize(event) {
-            const button = event.target
-            const parentWindow = button.closest('.window')
-            // parentWindow
+            const parentWindow = event.target.closest('.window')
+            const name = parentWindow.getAttribute('data-item')
+            parentWindow.classList.toggle('hidden')
+
+            const icon = document.querySelector(`.window-minimized .icon[data-item="${name}"]`)
+            console.log(name, icon)
+            icon.classList.toggle('hidden')
+        }
+
+        function restoreSize(event) {
+            const parentWindow = event.target.closest('.window')
+            parentWindow.classList.remove('hidden')
+            parentWindow.classList.remove('maximized')
+            parentWindow.style = {}
         }
 
         function windowMenu(event) {
             const button = event.target
             const contextMenu = button.querySelector('div.context-menu')
-            if (contextMenu) contextMenu.classList.toggle('hidden')
+            if (contextMenu) {
+                contextMenu.classList.toggle('hidden')
+                setTimeout(
+                    () => document.addEventListener('click', () => { contextMenu.classList.toggle('hidden') }, { once: true }),
+                    10
+                )
+            }
+        }
+
+        function minimizedWindow(event) {
+            const icon = event.target.closest('.icon')
+            const window = document.querySelector(`.window[data-item="${icon.getAttribute('data-item')}"]`)
+            window.classList.toggle('hidden')
+            icon.classList.toggle('hidden')
         }
 
         function eightBitImageAnimation(image, scale = 100, endScale = 10) {
@@ -279,13 +325,15 @@
         document.addEventListener("DOMContentLoaded", function() {
             document.body.addEventListener('dragover', dragOver, false)
             document.body.addEventListener('drop', dragDrop, false)
-            document.querySelectorAll('.window[draggable="true"]').forEach(win => {
+            document.querySelectorAll('[draggable="true"]').forEach(win => {
                 win.addEventListener("dragstart", dragStart, false)
                 win.addEventListener("dragend", dragEnd, false)
             })
-            document.querySelectorAll('.button.close').forEach(button => button.addEventListener("click", windowMenu, false))
-            document.querySelectorAll('.button.maximize').forEach(button => button.addEventListener("click", maximize, false))
-            document.querySelectorAll('.button.minimize').forEach(button => button.addEventListener("click", minimize, false))
+            document.querySelectorAll('.button').forEach(button => button.addEventListener("click", windowMenu, false))
+            document.querySelectorAll('.maximize').forEach(button => button.addEventListener("click", maximize, false))
+            document.querySelectorAll('.minimize').forEach(button => button.addEventListener("click", minimize, false))
+            document.querySelectorAll('.restore').forEach(button => button.addEventListener("click", restoreSize, false))
+            document.querySelectorAll('.window-minimized .icon').forEach(button => button.addEventListener("click", minimizedWindow, false))
 
             const img = new Image()
             img.onload = () => eightBitImageAnimation(img)
@@ -295,7 +343,13 @@
 </head>
 <body>
     <canvas id="background"></canvas>
-    <div class="window" draggable="true" data-item="main">
+    <div class="window-minimized">
+        <div class="icon hidden draggable" draggable="true" data-item="main">
+            <img src="./icon/PROGM001.PNG" />
+            <div class="text">Program Manager</div>
+        </div>
+    </div>
+    <div class="window draggable" draggable="true" data-item="main">
         <div class="topleft handle"></div>
         <div class="topright handle"></div>
         <div class="bottomleft handle"></div>
@@ -305,11 +359,11 @@
                 <div class="button close">
                     &#8212;
                     <div class="context-menu hidden">
-                        <div class="context-item"><span class="underline">R</span>estore</div>
-                        <div class="context-item"><span class="underline">M</span>ove</div>
-                        <div class="context-item"><span class="underline">S</span>ize</div>
-                        <div class="context-item">Mi<span class="underline">n</span>imize</div>
-                        <div class="context-item">Ma<span class="underline">x</span>imize</div>
+                        <div class="context-item restore"><span class="underline">R</span>estore</div>
+                        <div class="context-item disabled"><span class="underline">M</span>ove</div>
+                        <div class="context-item disabled"><span class="underline">S</span>ize</div>
+                        <div class="context-item minimize">Mi<span class="underline">n</span>imize</div>
+                        <div class="context-item maximize">Ma<span class="underline">x</span>imize</div>
                     </div>
                 </div>
                 <span class="title">maex.blue 3.11</span>
@@ -323,34 +377,34 @@
                 <div class="menuitem"><span class="underline">H</span>elp</div>
             </div>
             <div class="applications">
-                    <div class="icon">
-                        <a target="_blank" href="mailto:mail AT bluemaex.de?subject=maex.blue"><img src="./icon/email.svg" /></a>
-                        <div class="text">E-Mail</div>
-                    </div>
-                    <div class="icon">
-                        <img src="./icon/construction.svg" />
-                        <div class="text">Notes</div>
-                    </div>
-                    <div class="icon">
-                        <a rel="me" target="_blank" href="https://chaos.social/@bluemaex"><img src="./icon/mastodon.svg" /></a>
-                        <div class="text">Mastodon</div>
-                    </div>
-                    <div class="icon">
-                        <a target="_blank" href="https://maex.photos/bluemaex"><img src="./icon/pixelfed.svg" /></a>
-                        <div class="text">Pixelfed</div>
-                    </div>
-                    <div class="icon">
-                        <a target="_blank" href="https://github.com/bluemaex"><img src="./icon/github.svg" /></a>
-                        <div class="text">Github</div>
-                    </div>
-                    <div class="icon">
-                        <a target="_blank" href="https://www.strava.com/athletes/8942275"><img src="./icon/strava.svg" /></a>
-                        <div class="text">Strava</div>
-                    </div>
-                    <div class="icon">
-                        <a target="_blank" href="https://instagram.com/bluemaex"><img src="./icon/instagram.svg" /></a>
-                        <div class="text">Instagram</div>
-                    </div>
+                <div class="icon">
+                    <a target="_blank" href="mailto:mail AT bluemaex.de?subject=maex.blue"><img src="./icon/email.svg" /></a>
+                    <div class="text">E-Mail</div>
+                </div>
+                <div class="icon">
+                    <img src="./icon/construction.svg" />
+                    <div class="text">Notes</div>
+                </div>
+                <div class="icon">
+                    <a rel="me" target="_blank" href="https://chaos.social/@bluemaex"><img src="./icon/mastodon.svg" /></a>
+                    <div class="text">Mastodon</div>
+                </div>
+                <div class="icon">
+                    <a target="_blank" href="https://maex.photos/bluemaex"><img src="./icon/pixelfed.svg" /></a>
+                    <div class="text">Pixelfed</div>
+                </div>
+                <div class="icon">
+                    <a target="_blank" href="https://github.com/bluemaex"><img src="./icon/github.svg" /></a>
+                    <div class="text">Github</div>
+                </div>
+                <div class="icon">
+                    <a target="_blank" href="https://www.strava.com/athletes/8942275"><img src="./icon/strava.svg" /></a>
+                    <div class="text">Strava</div>
+                </div>
+                <div class="icon">
+                    <a target="_blank" href="https://instagram.com/bluemaex"><img src="./icon/instagram.svg" /></a>
+                    <div class="text">Instagram</div>
+                </div>
             </div>
         </div>
     </div>

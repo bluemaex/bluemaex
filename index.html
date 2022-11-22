@@ -216,13 +216,56 @@
             text-align: center;
             color: #fff;
         }
-        .window-minized .icon img {
+        .window-minimized .icon img {
             height: 32px;
             width: 32px;
             margin: 10px;
         }
+
+
+        /*
+        DOS Prompt related
+        */
+        @keyframes blink {
+            to {
+                visibility: hidden;
+            }
+        }
+        .dosprompt {
+            background: #000;
+            color: #fff;
+            font-family: monospace;
+            height: 100vh;
+            box-sizing: border-box;
+            overflow-y: scroll;
+            word-break: break-all;
+            padding: 16px;
+        }
+        .dosprompt .input {
+            display: inline;
+            outline: none;
+            visibility: visible;
+        }
+        .dosprompt .input:focus + .caret {
+            animation: blink 0.5s steps(5, start) infinite;
+        }
+        .dosprompt .history {
+            white-space: pre;
+        }
+        .caret {
+            border: 0;
+            padding: 0;
+            outline: none;
+            color: #fff;
+            background-color: #000;
+            display: inline-block;
+            font-family: monospace;
+        }
 	</style>
     <script>
+        /*
+         * dragndrop
+         */
         function dragStart(event) {
             const element = event.target.closest('.draggable')
             const style = window.getComputedStyle(element, null)
@@ -252,6 +295,14 @@
             source.style.top = `${event.clientY + data.top}px`
             event.preventDefault()
             return false
+        }
+
+        /*
+         * window functionality
+         */
+        function openWindow(name) {
+            const win = document.querySelector(`.window[data-item="${name}"]`)
+            win.classList.toggle('hidden')
         }
 
         function maximize(event) {
@@ -298,6 +349,9 @@
             icon.classList.toggle('hidden')
         }
 
+        /*
+         * background animation
+         */
         function eightBitImageAnimation(image, scale = 100, endScale = 10) {
             const canvas = document.getElementById('background')
             canvas.width = image.width
@@ -319,22 +373,87 @@
             ctx.drawImage(canvas, 0, 0, scaledW, scaledH, 0, 0, image.width, image.height)
         }
 
+        /*
+         * dosprompt
+         */
+        function handleCommand(command) {
+            const line = document.createElement('DIV')
+            line.classList.add('command')
+            line.textContent = `C:\MAEX\> ${ command }\r\n`
+
+            let content = ''
+            switch (command) {
+                case 'help':
+                    content = 'Have you tried turning it off and on again?'
+                    break
+                case 'dir':
+                    content = 'Read error'
+                    break
+                case command.match(/^echo .*/)?.input:
+                    content = command.substring(4).trim()
+                    break
+                default:
+                    content = `Illegal command: ${ command }.`
+            }
+
+            line.textContent += content
+            line.textContent += '\r\n\r\n'
+            document.querySelector('.dosprompt .history').appendChild(line)
+        }
+
+        function handleInput(event) {
+            const input = event.target
+
+            if (input.childElementCount > 0) {
+                const lines = input.innerText.replace(/\n$/, '').split('\n')
+                lines.forEach(line => handleCommand(line))
+                input.textContent = '';
+            }
+
+            if (input.textContent.length === 0) {
+                input.innerHTML = ''
+            }
+        }
+
+        function handleKeyDown(event) {
+            if (event.key !== 'Enter') return
+
+            const input = event.target
+            handleCommand(input.textContent)
+
+            input.textContent = ''
+            event.preventDefault()
+        }
+
+        /*
+         * boot
+         */
         document.addEventListener("DOMContentLoaded", function() {
+            // dragndrop
             document.body.addEventListener('dragover', dragOver, false)
             document.body.addEventListener('drop', dragDrop, false)
             document.querySelectorAll('[draggable="true"]').forEach(win => {
                 win.addEventListener("dragstart", dragStart, false)
                 win.addEventListener("dragend", dragEnd, false)
             })
+
+            // window
             document.querySelectorAll('.button').forEach(button => button.addEventListener("click", windowMenu, false))
+            document.querySelectorAll('.close').forEach(button => button.addEventListener("dblclick", minimize, false))
             document.querySelectorAll('.maximize').forEach(button => button.addEventListener("click", maximize, false))
             document.querySelectorAll('.minimize').forEach(button => button.addEventListener("click", minimize, false))
             document.querySelectorAll('.restore').forEach(button => button.addEventListener("click", restoreSize, false))
             document.querySelectorAll('.window-minimized .icon').forEach(button => button.addEventListener("click", minimizedWindow, false))
 
+            // background
             const img = new Image()
             img.onload = () => eightBitImageAnimation(img)
             img.src = './latest.jpg'
+
+            // msdos
+            document.querySelector('.dosprompt').addEventListener('click', () => document.querySelector('.dosprompt .input').focus())
+            document.querySelector('.dosprompt').addEventListener('input', handleInput)
+            document.querySelector('.dosprompt .input').addEventListener('keydown', handleKeyDown)
         })
     </script>
 </head>
@@ -344,6 +463,10 @@
         <div class="icon hidden draggable" draggable="true" data-item="main">
             <img src="./icon/PROGM001.PNG" />
             <div class="text">Program Manager</div>
+        </div>
+        <div class="icon hidden draggable" draggable="true" data-item="dosprompt">
+            <img src="./icon/msdos.svg" />
+            <div class="text">MS-DOS</div>
         </div>
     </div>
     <div class="window draggable" draggable="true" data-item="main">
@@ -402,6 +525,38 @@
                     <a target="_blank" href="https://instagram.com/bluemaex"><img src="./icon/instagram.svg" /></a>
                     <div class="text">Instagram</div>
                 </div>
+                <div class="icon">
+                    <a href="javascript:openWindow('dosprompt')"><img src="./icon/msdos.svg" /></a>
+                    <div class="text">MS-DOS</div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="window draggable hidden" draggable="true" data-item="dosprompt">
+        <div class="topleft handle"></div>
+        <div class="topright handle"></div>
+        <div class="bottomleft handle"></div>
+        <div class="bottomright handle"></div>
+        <div class="window-container">
+            <div class="titlebar">
+                <div class="button close">
+                    &#8212;
+                    <div class="context-menu hidden">
+                        <div class="context-item restore"><span class="underline">R</span>estore</div>
+                        <div class="context-item disabled"><span class="underline">M</span>ove</div>
+                        <div class="context-item disabled"><span class="underline">S</span>ize</div>
+                        <div class="context-item minimize">Mi<span class="underline">n</span>imize</div>
+                        <div class="context-item maximize">Ma<span class="underline">x</span>imize</div>
+                    </div>
+                </div>
+                <span class="title">MS-DOS</span>
+                <div class="button minimize">&#9660;</div>
+                <div class="button maximize">&#9650;</div>
+            </div>
+            <div class="dosprompt">
+                <div class="history"></div>
+                C:\MAEX>
+                <div class="input" contenteditable="true"></div><button class="caret" for="input">_</button>
             </div>
         </div>
     </div>

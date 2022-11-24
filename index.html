@@ -247,8 +247,16 @@
         .dosprompt .input:focus + .caret {
             animation: blink 0.5s steps(5, start) infinite;
         }
-        .dosprompt .history {
-            white-space: pre;
+        .dosprompt .history pre {
+            margin: 0;
+        }
+        .dosprompt .history pre + pre,
+        .dosprompt .history p {
+            margin-bottom: 20px;
+        }
+        .dosprompt .history .icon img {
+            background-color: #fff;
+            width: 80px;
         }
         .caret {
             border: 0;
@@ -392,42 +400,29 @@
          * dosprompt
          */
         function handleCommand(command) {
-            const line = document.createElement('DIV')
-            line.classList.add('command')
-            line.textContent = `C:\MAEX\> ${ command }\r\n`
+            const entry = document.createElement('DIV')
+            entry.classList.add('command')
 
-            let content = ''
-            switch (command) {
-                case 'help':
-                    content = 'Have you tried turning it off and on again?'
-                    break
-                case 'dir':
-                    content = 'Read error'
-                    break
-                case command.match(/^cd .*/)?.input:
-                    content = 'Access denied'
-                    break
-                case command.match(/^ls .*/)?.input:
-                    content = 'Wrong Operating System, my dear.'
-                    break
-                case command.match(/^echo .*/)?.input:
-                    content = command.substring(4).trim()
-                    break
-                case command.match(/^\s*$/)?.input:
-                    break
-                case 'exit':
-                    setTimeout(() => {
-                        closeWindow('dosprompt')
-                        document.querySelector('.dosprompt .history').innerHTML = ''
-                    })
-                    break;
-                default:
-                    content = `Illegal command: ${ command }.`
+            const commandName = document.createElement('PRE')
+            commandName.appendChild(document.createTextNode(`C:\MAEX> ${ command }\r\n`))
+            entry.appendChild(commandName)
+
+            const executable = command.split(' ')[0].toUpperCase()
+            const commandFn = window._commands[executable] || (() => `Illegal command: ${ command }.`)
+            let commandResult = commandFn(command.substr(executable.length+1))
+            if (typeof commandResult === 'string') {
+                const commandOutput = document.createElement('PRE')
+                commandOutput.innerText = commandResult
+                entry.appendChild(commandOutput)
+            } else {
+                const commandOutput = document.createElement('P')
+                commandOutput.appendChild(commandResult)
+                entry.appendChild(commandOutput)
             }
 
-            line.textContent += content
-            line.textContent += '\r\n\r\n'
-            document.querySelector('.dosprompt .history').appendChild(line)
+            const history = document.querySelector('.dosprompt .history')
+            history.appendChild(entry)
+            history.parentElement.scrollTop = history.scrollHeight;
         }
 
         function handlePaste(event) {
@@ -480,6 +475,30 @@
             document.querySelector('.dosprompt').addEventListener('click', () => document.querySelector('.dosprompt .input').focus())
             document.querySelector('.dosprompt').addEventListener('paste', handlePaste)
             document.querySelector('.dosprompt .input').addEventListener('keydown', handleKeyDown)
+
+            const apps = [...document.querySelectorAll('.applications .icon')].reduce((list, app) => {
+                const name = app.querySelector('.text').innerText.toUpperCase().replace('-', '')
+                if(name !== 'MSDOS') list[name] = () => app.cloneNode(true)
+                return list
+            }, {})
+            window._commands =  {
+                ...(apps || {}),
+                'HELP': () => 'Have you tried turning it off and on again?',
+                'CD'  : (args) =>  args ? (args === '..' ? 'There is no exit.' : 'Invalid directory') : '',
+                'ECHO': (args) => args,
+                'A:'   : (args) => `Not ready error reading drive ${args}\r\nInvalid directory`,
+                'B:'   : (args) => `Not ready error reading drive ${args}\r\nInvalid directory`,
+                'EXIT': () => setTimeout(() => {
+                    closeWindow('dosprompt')
+                    document.querySelector('.dosprompt .history').innerHTML = ''
+                }),
+                'DIR': () => `Directory of C:\\MAEX.\r\n` +
+                             `.\t\t<DIR>\r\n` +
+                             `..\t\t<DIR>\r\n` +
+                             `${ Object.keys(apps).map(x => x + (x.length > 7 ? '\t\t ' : '\t\t\t ') + x.length).join('\r\n')}\r\n` +
+                             `\t${Object.keys(apps).length} File(s)\t${Object.keys(apps).reduce((size, cmd) => size + cmd.length, 0)} Bytes.\r\n` +
+                             `\t2 Dir(s)   133,742 Bytes free.`
+            }
         })
     </script>
 </head>
@@ -524,11 +543,11 @@
             </div>
             <div class="applications">
                 <div class="icon">
-                    <a target="_blank" href="mailto:mail AT bluemaex.de?subject=maex.blue"><img src="./icon/email.svg" /></a>
+                    <a target="_blank" href="mailto:mail@bluemaex.de?subject=maex.blue"><img src="./icon/email.svg" /></a>
                     <div class="text">E-Mail</div>
                 </div>
                 <div class="icon">
-                    <img src="./icon/construction.svg" />
+                    <a><img src="./icon/construction.svg" /></a>
                     <div class="text">Notes</div>
                 </div>
                 <div class="icon">

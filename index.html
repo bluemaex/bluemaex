@@ -225,9 +225,9 @@
         DOS Prompt related
         */
         @keyframes blink {
-            to {
-                visibility: hidden;
-            }
+            from,
+            to  { border-color: transparent; }
+            50% { border-color: #fff; }
         }
         .dosprompt {
             background: #000;
@@ -240,12 +240,17 @@
             padding: 16px;
         }
         .dosprompt .input {
-            display: inline;
+            border: 0;
             outline: none;
-            visibility: visible;
+            caret-color: transparent;
+            font-family: monospace;
+            background-color: #000;
+            color: #fff;
+            width: 0ch;
         }
         .dosprompt .input:focus + .caret {
-            animation: blink 0.5s steps(5, start) infinite;
+            animation: blink 0.5s step-end infinite;
+            border-bottom: 2px solid white;
         }
         .dosprompt .history pre {
             margin: 0;
@@ -257,15 +262,6 @@
         .dosprompt .history .icon img {
             background-color: #fff;
             width: 80px;
-        }
-        .caret {
-            border: 0;
-            padding: 0;
-            outline: none;
-            color: #fff;
-            background-color: #000;
-            display: inline-block;
-            font-family: monospace;
         }
 	</style>
     <script>
@@ -317,9 +313,14 @@
          */
         function openWindow(name) {
             const win = document.querySelector(`.window[data-item="${name}"]`)
-            win.classList.remove('hidden')
+            if (!win.classList.contains('hidden')) return
 
-            if (name === 'dosprompt') setTimeout(() => document.querySelector('.dosprompt .input').focus(), 10)
+            if (name === 'dosprompt') {
+                resetTerminal()
+                setTimeout(() => win.querySelector('.input').focus(), 5)
+            }
+
+            win.classList.remove('hidden')
         }
 
         function closeWindow(event) {
@@ -330,6 +331,7 @@
 
             const win = document.querySelector(`.window[data-item="${name}"]`)
             win.classList.add('hidden')
+            win.style = {}
         }
 
         function toggleMaximize(event) {
@@ -404,10 +406,10 @@
             entry.classList.add('command')
 
             const commandName = document.createElement('PRE')
-            commandName.appendChild(document.createTextNode(`C:\MAEX> ${ command }\r\n`))
+            commandName.appendChild(document.createTextNode(`C:\\MAEX> ${ command }\r\n`))
             entry.appendChild(commandName)
 
-            const executable = command.split(' ')[0].toUpperCase()
+            const executable = command.trim().split(' ')[0].toUpperCase()
             const commandFn = window._commands[executable] || (() => `Illegal command: ${ command }.`)
             let commandResult = commandFn(command.substr(executable.length+1))
             if (typeof commandResult === 'string') {
@@ -430,19 +432,26 @@
 
             const input = event.target
             const data = (event.clipboardData || window.clipboardData).getData('text')
-            const lines = data.replace(/\n$/, '').split('\n')
-            lines.forEach(line => handleCommand(line))
-            input.textContent = ''
+            data.replace(/\n$/, '').split('\n').forEach(line => handleCommand(line))
+            resetTerminal(true)
         }
 
         function handleKeyDown(event) {
-            if (event.key !== 'Enter') return
-
             const input = event.target
-            handleCommand(input.textContent)
 
-            input.textContent = ''
-            event.preventDefault()
+            if (event.key === 'Enter') {
+                handleCommand(input.value)
+                resetTerminal(true)
+            } else {
+                input.style.width = `${input.value.length + (event.key === 'Backspace' ? -1 : 1)}ch`
+            }
+        }
+
+        function resetTerminal(keepScrollback = false) {
+            if (!keepScrollback) document.querySelector('.dosprompt .history').innerHTML = ''
+            const input = document.querySelector('.dosprompt .input')
+            input.value = ''
+            input.style.width = '0ch'
         }
 
         /*
@@ -472,7 +481,7 @@
             img.src = './latest.jpg'
 
             // msdos
-            document.querySelector('.dosprompt').addEventListener('click', () => document.querySelector('.dosprompt .input').focus())
+            document.querySelector('.window[data-item="dosprompt"]').addEventListener('click', () => document.querySelector('.dosprompt .input').focus())
             document.querySelector('.dosprompt').addEventListener('paste', handlePaste)
             document.querySelector('.dosprompt .input').addEventListener('keydown', handleKeyDown)
 
@@ -483,15 +492,16 @@
             }, {})
             window._commands =  {
                 ...(apps || {}),
-                'HELP': () => 'Have you tried turning it off and on again?',
+                '': () => '',
+                'HELP': () => 'Have you tried turning it off and on again?\r\n(see all files with `dir`)',
                 'CD'  : (args) =>  args ? (args === '..' ? 'There is no exit.' : 'Invalid directory') : '',
                 'ECHO': (args) => args,
                 'A:'   : (args) => `Not ready error reading drive ${args}\r\nInvalid directory`,
                 'B:'   : (args) => `Not ready error reading drive ${args}\r\nInvalid directory`,
-                'EXIT': () => setTimeout(() => {
-                    closeWindow('dosprompt')
-                    document.querySelector('.dosprompt .history').innerHTML = ''
-                }),
+                'EXIT': () => {
+                    setTimeout(() => closeWindow('dosprompt'))
+                    return ''
+                },
                 'DIR': () => `Directory of C:\\MAEX.\r\n` +
                              `.\t\t<DIR>\r\n` +
                              `..\t\t<DIR>\r\n` +
@@ -601,8 +611,10 @@
             </div>
             <div class="dosprompt">
                 <div class="history"></div>
-                C:\MAEX>
-                <div class="input" contenteditable="true"></div><button class="caret" for="input">_</button>
+                <div class="entry">
+                    <span class="cwd">C:\MAEX></span>
+                    <input class="input" /><span class="caret">&nbsp;</span>
+                </div>
             </div>
         </div>
     </div>
